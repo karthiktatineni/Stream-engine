@@ -34,5 +34,5 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = 3001;
+const PORT = 8080;
 server.listen(PORT, () => console.log(`Pure 4K P2P Engine Ready on Port ${PORT}`));
