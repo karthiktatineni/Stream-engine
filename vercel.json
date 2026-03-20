@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/room/:id", "destination": "/index.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
