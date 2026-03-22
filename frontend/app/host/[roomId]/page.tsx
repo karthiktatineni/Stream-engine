@@ -156,8 +156,6 @@ export default function HostRoom({ params }: { params: Promise<{ roomId: string 
 
       peersRef.current.forEach((pc) => pc.close());
       peersRef.current.clear();
-      
-      socket.emit("end-stream", { roomId });
     };
   }, [user, socket, isConnected, roomId, createPeerForViewer]);
 
@@ -276,7 +274,7 @@ export default function HostRoom({ params }: { params: Promise<{ roomId: string 
 
         {/* Controls */}
         <div className="h-20 border-t border-border-subtle flex items-center justify-center gap-4 px-6 bg-bg-secondary/50 shrink-0">
-          <VoiceChat roomId={roomId} autoJoin={true} />
+          <VoiceChat roomId={roomId} autoJoin={true} broadcastStream={stream} />
           
           <button
             onClick={toggleFullscreen}

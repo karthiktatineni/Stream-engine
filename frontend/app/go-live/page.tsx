@@ -25,7 +25,7 @@ export default function GoLiveSetup() {
   useEffect(() => {
     if (!authLoading && !user) {
       toast.error("You must be signed in to stream");
-      router.push("/");
+      router.push("/login");
     }
   }, [user, authLoading, router]);
 

@@ -18,7 +18,15 @@ const ICE_SERVERS = {
   ],
 };
 
-export default function VoiceChat({ roomId, autoJoin = false }: { roomId: string; autoJoin?: boolean }) {
+export default function VoiceChat({ 
+  roomId, 
+  autoJoin = false, 
+  broadcastStream = null 
+}: { 
+  roomId: string; 
+  autoJoin?: boolean;
+  broadcastStream?: MediaStream | null;
+}) {
   const { socket } = useSocket();
   const [isInVoice, setIsInVoice] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -199,12 +207,22 @@ export default function VoiceChat({ roomId, autoJoin = false }: { roomId: string
   };
 
   const toggleMute = () => {
-    if (!localStreamRef.current) return;
-    const audioTrack = localStreamRef.current.getAudioTracks()[0];
-    if (audioTrack) {
-      audioTrack.enabled = !audioTrack.enabled;
-      setIsMuted(!audioTrack.enabled);
-      socket?.emit('voice-mute-toggle', { roomId, isMuted: !audioTrack.enabled });
+    // Toggle voice chat stream
+    if (localStreamRef.current) {
+      const voiceTrack = localStreamRef.current.getAudioTracks()[0];
+      if (voiceTrack) {
+        voiceTrack.enabled = !voiceTrack.enabled;
+        setIsMuted(!voiceTrack.enabled);
+        socket?.emit('voice-mute-toggle', { roomId, isMuted: !voiceTrack.enabled });
+      }
+    }
+
+    // Also toggle broadcast stream if provided (for host)
+    if (broadcastStream) {
+      const broadcastTracks = broadcastStream.getAudioTracks();
+      broadcastTracks.forEach(track => {
+        track.enabled = !track.enabled;
+      });
     }
   };
 

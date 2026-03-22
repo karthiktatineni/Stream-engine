@@ -4,14 +4,15 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useSocket } from "@/context/SocketContext";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LogIn, LogOut, Radio, Wifi, WifiOff } from "lucide-react";
 import Image from "next/image";
 
 export default function Navbar() {
-  const { user, signInWithGoogle, signOut, loading } = useAuth();
+  const { user, signInWithGoogle, signInEmail, signOut, loading } = useAuth();
   const { connectionState } = useSocket();
   const pathname = usePathname();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -20,8 +21,8 @@ export default function Navbar() {
 
   if (!mounted) return null;
 
-  // Hide global navbar on host and watch pages
-  if (pathname.startsWith("/host/") || pathname.startsWith("/watch/")) {
+  // Hide global navbar on login, host and watch pages
+  if (pathname === "/login" || pathname.startsWith("/host/") || pathname.startsWith("/watch/")) {
     return null;
   }
 
@@ -101,13 +102,13 @@ export default function Navbar() {
                   </div>
                 </div>
               ) : (
-                <button
-                  onClick={signInWithGoogle}
+                <Link
+                  href="/login"
                   className="bg-text-primary text-bg-primary hover:bg-text-secondary px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 text-sm"
                 >
                   <LogIn className="w-4 h-4" />
                   Sign In
-                </button>
+                </Link>
               )}
             </>
           )}

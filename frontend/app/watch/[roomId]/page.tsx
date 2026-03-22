@@ -11,7 +11,7 @@ import ParticipantList from "@/components/ParticipantList";
 import {
   Play, Users, Clock, AlertTriangle, Radio, Eye,
   MessageCircle, ChevronLeft, ChevronRight, Share2,
-  WifiOff, RefreshCw, Maximize
+  WifiOff, RefreshCw, Maximize, Volume2
 } from "lucide-react";
 
 interface ParticipantInfo {
@@ -52,6 +52,7 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
   const [kicked, setKicked] = useState(false);
   const [sidePanel, setSidePanel] = useState<'chat' | 'participants'>('chat');
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
+  const [volume, setVolume] = useState(0.8);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
@@ -306,9 +307,29 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
           {/* Viewer Controls */}
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 px-6 py-3 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 z-30">
             <VoiceChat roomId={roomId} autoJoin={true} />
+            
+            <div className="w-px h-6 bg-white/10 mx-1" />
+            
+            <div className="flex items-center gap-2 group w-32">
+              <Volume2 className="w-5 h-5 text-white/70" />
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                value={volume}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setVolume(val);
+                  if (videoRef.current) videoRef.current.volume = val;
+                }}
+                className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-accent-primary"
+              />
+            </div>
+
             <button
               onClick={toggleFullscreen}
-              className="p-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-all"
+              className="p-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-all font-bold"
               title="Fullscreen"
             >
               <Maximize size={24} />

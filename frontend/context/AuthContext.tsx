@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { onAuthStateChanged, User, signInWithPopup, signOut as firebaseSignOut } from "firebase/auth";
+import { onAuthStateChanged, User, signInWithPopup, signOut as firebaseSignOut, signInWithEmailAndPassword } from "firebase/auth";
 import { auth, googleProvider } from "../lib/firebase";
 
 interface AuthContextType {
@@ -8,6 +8,7 @@ interface AuthContextType {
   loading: boolean;
   token: string | null;
   signInWithGoogle: () => Promise<void>;
+  signInEmail: (email: string, pass: string) => Promise<void>;
   signOut: () => Promise<void>;
   getToken: () => Promise<string | null>;
 }
@@ -16,8 +17,9 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   token: null,
-  signInWithGoogle: async () => {},
-  signOut: async () => {},
+  signInWithGoogle: async () => { },
+  signInEmail: async () => { },
+  signOut: async () => { },
   getToken: async () => null,
 });
 
@@ -75,6 +77,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
+  const signInEmail = useCallback(async (email: string, pass: string) => {
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (error) {
+      console.error("Error signing in with Email", error);
+    }
+  }, []);
+
   const handleSignOut = useCallback(async () => {
     try {
       await firebaseSignOut(auth);
@@ -85,7 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, token, signInWithGoogle, signOut: handleSignOut, getToken }}>
+    <AuthContext.Provider value={{ user, loading, token, signInWithGoogle, signInEmail, signOut: handleSignOut, getToken }}>
       {children}
     </AuthContext.Provider>
   );
