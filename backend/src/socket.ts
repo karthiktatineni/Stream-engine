@@ -236,6 +236,14 @@ export const initSocket = (server: HttpServer, allowedOrigins: string[]) => {
         }
       }
 
+      // Also notify host if host is not in participants list
+      if (room.hostSocketId !== socket.id) {
+        io.to(room.hostSocketId).emit('voice-peer-joined', {
+          peerSocketId: socket.id,
+          displayName: userName,
+        });
+      }
+
       logger.info('Voice', `User joined voice: ${userName}`, { roomId: data.roomId });
     });
 
@@ -398,24 +406,14 @@ export const initSocket = (server: HttpServer, allowedOrigins: string[]) => {
 
       if (room.hostUid === userId) {
         // Host reconnecting - restore live status
-        const oldHostSocketId = room.hostSocketId;
         room.status = 'live';
         room.hostSocketId = socket.id;
-        
-        // Update host in participants list
-        const hostParticipant = room.participants.get(oldHostSocketId);
-        if (hostParticipant) {
-          room.participants.delete(oldHostSocketId);
-          hostParticipant.socketId = socket.id;
-          room.participants.set(socket.id, hostParticipant);
-        }
-
         socket.join(data.roomId);
         const roomState = roomManager.getRoomState(room);
         io.to(data.roomId).emit('room-updated', roomState);
         if (typeof callback === 'function') callback({ success: true, room: roomState, isHost: true });
         broadcastActiveRooms();
-        logger.info('Socket', `Host reconnected and room restored`, { roomId: data.roomId, oldSocket: oldHostSocketId, newSocket: socket.id });
+        logger.info('Socket', `Host reconnected and room restored`, { roomId: data.roomId });
       } else {
         // Viewer reconnecting
         const participant: Participant = {
