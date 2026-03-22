@@ -11,7 +11,7 @@ import ParticipantList from "@/components/ParticipantList";
 import {
   Play, Users, Clock, AlertTriangle, Radio, Eye,
   MessageCircle, ChevronLeft, ChevronRight, Share2,
-  WifiOff, RefreshCw
+  WifiOff, RefreshCw, Maximize
 } from "lucide-react";
 
 interface ParticipantInfo {
@@ -177,10 +177,20 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
     toast.success("Room link copied!");
   };
 
+  const toggleFullscreen = () => {
+    if (videoRef.current) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        videoRef.current.requestFullscreen().catch(console.error);
+      }
+    }
+  };
+
   // Loading state
   if (!isJoined && !streamEnded && !kicked) {
     return (
-      <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-bg-primary">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-bg-primary">
         <div className="w-10 h-10 border-2 border-accent-primary border-t-transparent rounded-full animate-spin mb-4" />
         <span className="text-sm font-semibold text-text-secondary">Joining room...</span>
       </div>
@@ -190,7 +200,7 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
   // Kicked state
   if (kicked) {
     return (
-      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-bg-primary px-4">
+      <div className="min-h-screen flex items-center justify-center bg-bg-primary px-4">
         <div className="bg-bg-secondary border border-border-subtle rounded-2xl p-8 max-w-sm w-full text-center">
           <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
             <AlertTriangle className="w-8 h-8 text-destructive" />
@@ -211,7 +221,7 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
   // Stream ended state
   if (streamEnded) {
     return (
-      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-bg-primary px-4">
+      <div className="min-h-screen flex items-center justify-center bg-bg-primary px-4">
         <div className="bg-bg-secondary border border-border-subtle rounded-2xl p-8 max-w-sm w-full text-center">
           <div className="w-16 h-16 rounded-2xl bg-warning/10 flex items-center justify-center mx-auto mb-4">
             <Radio className="w-8 h-8 text-warning" />
@@ -232,7 +242,7 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] overflow-hidden bg-bg-primary text-text-primary">
+    <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-bg-primary text-text-primary">
       {/* Video & Info */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
@@ -254,13 +264,19 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
             )}
           </div>
           <div className="flex items-center gap-2">
-            <VoiceChat roomId={roomId} />
             <button
               onClick={shareRoom}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated hover:bg-bg-tertiary text-text-secondary text-xs font-semibold border border-border-subtle transition-all"
+              className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
             >
-              <Share2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Share</span>
+              <Share2 size={16} />
+              Share Stream
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              className="p-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-all ml-1"
+              title="Fullscreen"
+            >
+              <Maximize size={20} />
             </button>
             <button
               onClick={() => setIsSidePanelOpen(!isSidePanelOpen)}
@@ -286,6 +302,18 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
             autoPlay
             className="w-full h-full object-contain"
           />
+
+          {/* Viewer Controls */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 px-6 py-3 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 z-30">
+            <VoiceChat roomId={roomId} autoJoin={true} />
+            <button
+              onClick={toggleFullscreen}
+              className="p-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-all"
+              title="Fullscreen"
+            >
+              <Maximize size={24} />
+            </button>
+          </div>
 
           {/* Play overlay for autoplay-blocked browsers */}
           {remoteStream && !isPlaying && (

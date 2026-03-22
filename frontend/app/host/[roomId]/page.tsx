@@ -8,9 +8,11 @@ import toast from "react-hot-toast";
 import LiveChat from "@/components/LiveChat";
 import VoiceChat from "@/components/VoiceChat";
 import ParticipantList from "@/components/ParticipantList";
+import { useStream } from "@/context/StreamContext";
 import {
   MicOff, Mic, StopCircle, Eye, Users, Copy, 
-  MessageCircle, ChevronLeft, ChevronRight, Monitor
+  MessageCircle, ChevronLeft, ChevronRight, Monitor,
+  Maximize
 } from "lucide-react";
 
 interface ParticipantInfo {
@@ -27,18 +29,18 @@ export default function HostRoom({ params }: { params: Promise<{ roomId: string 
 
   const { socket, isConnected } = useSocket();
   const { user } = useAuth();
+  const { activeStream: stream, stopStream } = useStream();
   const router = useRouter();
 
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [participantsCount, setParticipantsCount] = useState(0);
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
-  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isMicMuted, setIsMicMuted] = useState(false);
   const [sidePanel, setSidePanel] = useState<'chat' | 'participants'>('chat');
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const localStreamRef = useRef<MediaStream | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null); // This ref is now largely unused due to stream context
 
   const iceServers = {
     iceServers: [
@@ -48,7 +50,7 @@ export default function HostRoom({ params }: { params: Promise<{ roomId: string 
   };
 
   const createPeerForViewer = useCallback((viewerSocketId: string) => {
-    if (!socket || !localStreamRef.current) return;
+    if (!socket || !stream) return;
 
     const existing = peersRef.current.get(viewerSocketId);
     if (existing) {
@@ -58,8 +60,8 @@ export default function HostRoom({ params }: { params: Promise<{ roomId: string 
     const pc = new RTCPeerConnection(iceServers);
     peersRef.current.set(viewerSocketId, pc);
 
-    localStreamRef.current.getTracks().forEach((track) => {
-      pc.addTrack(track, localStreamRef.current!);
+    stream.getTracks().forEach((track) => {
+      pc.addTrack(track, stream);
     });
 
     pc.onicecandidate = (event) => {
@@ -80,45 +82,25 @@ export default function HostRoom({ params }: { params: Promise<{ roomId: string 
         });
       })
       .catch((e) => console.error("Error creating offer:", e));
-  }, [socket]);
+  }, [socket, stream]);
 
+  // Handle Stream Lifecycle
+  useEffect(() => {
+    if (stream) {
+      console.log("Picking up active stream from context.");
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } else {
+      console.error("Critical: No active stream in context");
+      toast.error("No active session found. Redirecting...");
+      router.push("/go-live");
+    }
+  }, [stream, router]);
+
+  // Separate Effect for Socket Handlers
   useEffect(() => {
     if (!user || !socket || !isConnected) return;
-
-    let mounted = true;
-
-    const initStream = async () => {
-      // If we already have a stream, don't try to pick up from window again
-      if (localStreamRef.current && localStreamRef.current.active) return;
-
-      const previewStream = (window as any).__streamEnginePreviewStream as MediaStream | undefined;
-
-      let mediaStream: MediaStream;
-
-      if (previewStream && previewStream.active) {
-        mediaStream = previewStream;
-        // Only clear from global after it's confirmed found
-        delete (window as any).__streamEnginePreviewStream;
-        delete (window as any).__streamEngineScreenShare;
-      } else {
-        toast.error("No active stream found. Returning to setup.");
-        router.push("/go-live");
-        return;
-      }
-
-      if (!mounted) {
-        mediaStream.getTracks().forEach(t => t.stop());
-        return;
-      }
-
-      localStreamRef.current = mediaStream;
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-    };
-
-    initStream();
 
     const onViewerJoined = (data: { viewerSocketId: string; displayName: string }) => {
       createPeerForViewer(data.viewerSocketId);
@@ -166,30 +148,28 @@ export default function HostRoom({ params }: { params: Promise<{ roomId: string 
     socket.on("viewer-left", onViewerLeft);
 
     return () => {
-      mounted = false;
       socket.off("viewer-joined", onViewerJoined);
       socket.off("webrtc-answer", onAnswer);
       socket.off("webrtc-ice-candidate", onIceCandidate);
       socket.off("room-updated", onRoomUpdated);
       socket.off("viewer-left", onViewerLeft);
 
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => track.stop());
-        localStreamRef.current = null;
-      }
       peersRef.current.forEach((pc) => pc.close());
       peersRef.current.clear();
-
+      
       socket.emit("end-stream", { roomId });
     };
-  }, [user, socket, isConnected, roomId, router, createPeerForViewer]);
+  }, [user, socket, isConnected, roomId, createPeerForViewer]);
 
   const toggleAudio = () => {
     if (stream) {
       const audioTrack = stream.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
-        setIsAudioMuted(!audioTrack.enabled);
+        setIsMicMuted(!audioTrack.enabled);
+        toast(audioTrack.enabled ? "Microphone On" : "Microphone Muted", { icon: audioTrack.enabled ? '🎤' : '🔇' });
+      } else {
+        toast.error("No microphone track found");
       }
     }
   };
@@ -197,9 +177,7 @@ export default function HostRoom({ params }: { params: Promise<{ roomId: string 
   const endStream = () => {
     if (socket) {
       socket.emit("end-stream", { roomId }, () => {
-        if (stream) {
-          stream.getTracks().forEach((t) => t.stop());
-        }
+        stopStream();
         toast.success("Stream ended");
         router.push("/");
       });
@@ -223,6 +201,16 @@ export default function HostRoom({ params }: { params: Promise<{ roomId: string 
     });
   };
 
+  const toggleFullscreen = () => {
+    if (videoRef.current) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        videoRef.current.requestFullscreen().catch(console.error);
+      }
+    }
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen pt-20 flex items-center justify-center">
@@ -232,7 +220,7 @@ export default function HostRoom({ params }: { params: Promise<{ roomId: string 
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-bg-primary text-text-primary">
+    <div className="flex h-screen overflow-hidden bg-bg-primary text-text-primary">
       {/* Main Broadcast Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
@@ -249,13 +237,12 @@ export default function HostRoom({ params }: { params: Promise<{ roomId: string 
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <VoiceChat roomId={roomId} />
             <button
               onClick={copyLink}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated hover:bg-bg-tertiary text-text-secondary text-xs font-semibold border border-border-subtle transition-all"
+              className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
             >
-              <Copy className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Copy Link</span>
+              <Copy size={16} />
+              Invite Friends
             </button>
             <button
               onClick={() => setIsSidePanelOpen(!isSidePanelOpen)}
@@ -289,17 +276,16 @@ export default function HostRoom({ params }: { params: Promise<{ roomId: string 
 
         {/* Controls */}
         <div className="h-20 border-t border-border-subtle flex items-center justify-center gap-4 px-6 bg-bg-secondary/50 shrink-0">
+          <VoiceChat roomId={roomId} autoJoin={true} />
+          
           <button
-            onClick={toggleAudio}
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
-              isAudioMuted
-                ? "bg-destructive/15 text-destructive border border-destructive/30 shadow-lg shadow-destructive/10"
-                : "bg-bg-elevated text-text-secondary hover:text-text-primary border border-border-subtle hover:border-text-muted/30"
-            }`}
-            title={isAudioMuted ? "Unmute mic" : "Mute mic"}
+            onClick={toggleFullscreen}
+            className="p-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-all"
+            title="Fullscreen"
           >
-            {isAudioMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+            <Maximize size={24} />
           </button>
+
           <div className="w-px h-8 bg-border-subtle mx-2" />
           <button
             onClick={endStream}

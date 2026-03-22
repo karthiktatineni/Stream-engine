@@ -6,19 +6,19 @@ import { useSocket } from "@/context/SocketContext";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Radio, Settings2, Monitor, AlertCircle, XCircle } from "lucide-react";
+import { useStream } from "@/context/StreamContext";
 
 export default function GoLiveSetup() {
   const { user, loading: authLoading } = useAuth();
   const { socket, isConnected } = useSocket();
+  const { activeStream, setActiveStream, setIsScreenShare } = useStream();
   const router = useRouter();
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Just Chatting");
   const [isPublic, setIsPublic] = useState(true);
-  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [starting, setStarting] = useState(false);
   const [actualCapability, setActualCapability] = useState<string>("");
-  const isNavigatingToRoom = useRef(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -30,18 +30,18 @@ export default function GoLiveSetup() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (previewStream && videoRef.current) {
-      videoRef.current.srcObject = previewStream;
+    if (activeStream && videoRef.current) {
+      videoRef.current.srcObject = activeStream;
     }
-  }, [previewStream]);
+  }, [activeStream]);
 
   const stopPreview = useCallback(() => {
-    if (previewStream) {
-      previewStream.getTracks().forEach((track) => track.stop());
-      setPreviewStream(null);
+    if (activeStream) {
+      activeStream.getTracks().forEach((track) => track.stop());
+      setActiveStream(null);
     }
     setActualCapability("");
-  }, [previewStream]);
+  }, [activeStream, setActiveStream]);
 
   const requestScreenShare = useCallback(async () => {
     stopPreview();
@@ -79,12 +79,13 @@ export default function GoLiveSetup() {
       const settings = videoTrack?.getSettings();
       const actualLabel = `Screen: ${settings?.width}x${settings?.height} @ ${Math.round(settings?.frameRate || 30)}FPS`;
       setActualCapability(actualLabel);
-      setPreviewStream(combinedStream);
+      setActiveStream(combinedStream);
+      setIsScreenShare(true);
       toast.success(actualLabel);
 
       // Handle the browser's "Stop sharing" button
       videoTrack?.addEventListener('ended', () => {
-        setPreviewStream(null);
+        setActiveStream(null);
         setActualCapability("");
         toast("Screen sharing stopped", { icon: '🖥️' });
       });
@@ -92,23 +93,14 @@ export default function GoLiveSetup() {
       console.error(err);
       toast.error("Screen share cancelled or denied");
     }
-  }, [stopPreview]);
-
-  useEffect(() => {
-    return () => {
-      // ONLY stop tracks if we're not passing them to the next page
-      if (!isNavigatingToRoom.current) {
-        previewStream?.getTracks().forEach((t) => t.stop());
-      }
-    };
-  }, [previewStream]);
+  }, [stopPreview, setActiveStream, setIsScreenShare]);
 
   const handleStartStream = () => {
     if (!title.trim()) {
       toast.error("Enter a stream title");
       return;
     }
-    if (!previewStream) {
+    if (!activeStream) {
       toast.error("Select your screen to share first");
       return;
     }
@@ -123,11 +115,8 @@ export default function GoLiveSetup() {
       { title: title.trim(), category, isPublic },
       (response: any) => {
         if (response.success) {
+          console.log("Stream created successfully, routing to host.", response.roomId);
           toast.success("Stream created!");
-          // Mark that we are navigating, so unmount cleanup doesn't stop the tracks
-          isNavigatingToRoom.current = true;
-          (window as any).__streamEnginePreviewStream = previewStream;
-          (window as any).__streamEngineScreenShare = true;
           router.push(`/host/${response.roomId}`);
         } else {
           toast.error(response.error || "Failed to start stream");
@@ -165,13 +154,13 @@ export default function GoLiveSetup() {
         <div className="lg:col-span-3 space-y-4">
           <div className="bg-bg-secondary rounded-2xl border border-border-subtle overflow-hidden">
             <div className="aspect-video bg-bg-primary relative flex items-center justify-center">
-              {previewStream ? (
+              {activeStream ? (
                 <video
                   ref={videoRef}
                   autoPlay
                   playsInline
                   muted
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain rounded-2xl shadow-2xl"
                 />
               ) : (
                 <div className="text-center flex flex-col items-center p-8">
@@ -191,28 +180,21 @@ export default function GoLiveSetup() {
               )}
             </div>
 
-            {previewStream && (
-              <div className="px-4 py-3 flex items-center justify-between border-t border-border-subtle bg-bg-secondary/80">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-success animate-status-pulse" />
-                  <span className="text-xs font-semibold text-success">Screen Selected</span>
-                  <span className="text-xs text-text-muted ml-1">{actualCapability}</span>
+            {activeStream && (
+              <div className="px-4 py-3 bg-bg-secondary/50 border-t border-border-subtle flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-sm text-text-secondary font-medium">
+                    {actualCapability || "Screen Feed Active"}
+                  </span>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={requestScreenShare}
-                    className="text-xs text-text-muted hover:text-text-primary px-3 py-1.5 rounded-lg hover:bg-bg-elevated border border-border-subtle transition-all"
-                  >
-                    Change Screen
-                  </button>
-                  <button
-                    onClick={stopPreview}
-                    className="text-xs text-destructive hover:text-destructive/80 px-3 py-1.5 rounded-lg hover:bg-destructive/10 transition-all flex items-center gap-1.5 font-semibold"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    Reset
-                  </button>
-                </div>
+                
+                <button
+                  onClick={stopPreview}
+                  className="text-xs text-red-400 hover:text-red-300 transition-colors flex items-center gap-1.5 font-medium"
+                >
+                  <XCircle size={14} /> Reset Source
+                </button>
               </div>
             )}
           </div>
@@ -285,8 +267,8 @@ export default function GoLiveSetup() {
 
             <button
               onClick={handleStartStream}
-              disabled={starting || !previewStream || !title.trim()}
-              className="w-full mt-8 py-4 bg-accent-primary hover:bg-accent-hover disabled:bg-bg-elevated disabled:text-text-muted disabled:cursor-not-allowed text-white font-extrabold rounded-xl transition-all shadow-xl hover:shadow-accent-primary/30 flex items-center justify-center gap-2 active:scale-[0.98]"
+              disabled={starting || !activeStream || !title.trim()}
+              className="w-full mt-8 py-4 bg-accent-primary hover:bg-accent-hover disabled:opacity-50 disabled:hover:bg-accent-primary text-white font-bold rounded-2xl shadow-xl shadow-accent-primary/20 transition-all flex items-center justify-center gap-3 disabled:cursor-not-allowed group relative overflow-hidden"
             >
               <Radio className="w-5 h-5" />
               {starting ? "Starting..." : "Begin Broadcast"}

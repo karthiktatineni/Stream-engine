@@ -19,6 +19,8 @@ function sanitize(str: string): string {
 }
 
 export const initSocket = (server: HttpServer, allowedOrigins: string[]) => {
+  const hostDisconnectTimeouts: Map<string, NodeJS.Timeout> = new Map();
+
   const io = new Server(server, {
     cors: {
       origin: allowedOrigins,
@@ -403,7 +405,14 @@ export const initSocket = (server: HttpServer, allowedOrigins: string[]) => {
       }
 
       if (room.hostUid === userId) {
-        // Host reconnecting
+        // Host reconnecting - clear any pending cleanup timeout
+        const pendingTimeout = hostDisconnectTimeouts.get(data.roomId);
+        if (pendingTimeout) {
+          clearTimeout(pendingTimeout);
+          hostDisconnectTimeouts.delete(data.roomId);
+          logger.info('Socket', `Host reconnection cancelled pending cleanup`, { roomId: data.roomId });
+        }
+
         room.hostSocketId = socket.id;
         socket.join(data.roomId);
         const roomState = roomManager.getRoomState(room);
@@ -443,12 +452,21 @@ export const initSocket = (server: HttpServer, allowedOrigins: string[]) => {
     socket.on('disconnect', (reason) => {
       logger.info('Socket', `Disconnected: ${socket.id}`, { reason });
 
-      // Cleanup host rooms
+      // Cleanup host rooms with grace period
       const hostRooms = roomManager.findRoomsByHost(socket.id);
       for (const room of hostRooms) {
-        room.status = 'ended';
-        io.to(room.id).emit('stream-ended', { reason: 'host-disconnected' });
-        roomManager.deleteRoom(room.id);
+        logger.info('Socket', `Host disconnected, starting 30s grace period`, { roomId: room.id });
+        
+        const timeout = setTimeout(() => {
+          room.status = 'ended';
+          io.to(room.id).emit('stream-ended', { reason: 'host-disconnected' });
+          roomManager.deleteRoom(room.id);
+          hostDisconnectTimeouts.delete(room.id);
+          broadcastActiveRooms();
+          logger.info('Socket', `Grace period expired. Stream deleted.`, { roomId: room.id });
+        }, 30000); // 30 second grace period
+
+        hostDisconnectTimeouts.set(room.id, timeout);
       }
 
       // Cleanup viewer participations

@@ -18,7 +18,7 @@ const ICE_SERVERS = {
   ],
 };
 
-export default function VoiceChat({ roomId }: { roomId: string }) {
+export default function VoiceChat({ roomId, autoJoin = false }: { roomId: string; autoJoin?: boolean }) {
   const { socket } = useSocket();
   const [isInVoice, setIsInVoice] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -141,7 +141,12 @@ export default function VoiceChat({ roomId }: { roomId: string }) {
     socket.on('voice-peer-left', handlePeerLeft);
     socket.on('voice-offer', handleVoiceOffer);
     socket.on('voice-answer', handleVoiceAnswer);
-    socket.on('voice-ice-candidate', handleVoiceIceCandidate);
+    socket.on('webrtc-ice-candidate', handleVoiceIceCandidate);
+    
+    // Auto-join if requested
+    if (autoJoin && !isInVoice && micPermission === 'prompt') {
+      joinVoice();
+    }
 
     return () => {
       socket.off('voice-peer-joined', handlePeerJoined);

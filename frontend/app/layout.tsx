@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '../context/AuthContext';
 import { SocketProvider } from '../context/SocketContext';
+import { StreamProvider } from '../context/StreamContext';
 import Navbar from '@/components/Navbar';
 import { Toaster } from 'react-hot-toast';
 
@@ -25,36 +26,38 @@ export default function RootLayout({
       <body className="bg-bg-primary text-text-primary min-h-screen flex flex-col">
         <AuthProvider>
           <SocketProvider>
-            <Navbar />
-            <main className="flex-1 w-full flex flex-col pt-16">
-              {children}
-            </main>
-            <Toaster
-              position="bottom-right"
-              toastOptions={{
-                duration: 3000,
-                style: {
-                  background: '#1a1a1f',
-                  color: '#fafafa',
-                  border: '1px solid #27272a',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                  fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif',
-                },
-                success: {
-                  iconTheme: {
-                    primary: '#6366f1',
-                    secondary: '#fafafa',
+            <StreamProvider>
+              <Navbar />
+              <main className="flex-1 w-full flex flex-col">
+                {children}
+              </main>
+              <Toaster
+                position="bottom-right"
+                toastOptions={{
+                  duration: 3000,
+                  style: {
+                    background: '#1a1a1f',
+                    color: '#fafafa',
+                    border: '1px solid #27272a',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif',
                   },
-                },
-                error: {
-                  iconTheme: {
-                    primary: '#ef4444',
-                    secondary: '#fafafa',
+                  success: {
+                    iconTheme: {
+                      primary: '#6366f1',
+                      secondary: '#fafafa',
+                    },
                   },
-                },
-              }}
-            />
+                  error: {
+                    iconTheme: {
+                      primary: '#ef4444',
+                      secondary: '#fafafa',
+                    },
+                  },
+                }}
+              />
+            </StreamProvider>
           </SocketProvider>
         </AuthProvider>
       </body>

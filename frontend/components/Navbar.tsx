@@ -1,16 +1,32 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useSocket } from "@/context/SocketContext";
+import { usePathname } from "next/navigation";
 import { LogIn, LogOut, Radio, Wifi, WifiOff } from "lucide-react";
 import Image from "next/image";
 
 export default function Navbar() {
   const { user, signInWithGoogle, signOut, loading } = useAuth();
   const { connectionState } = useSocket();
+  const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  // Hide global navbar on host and watch pages
+  if (pathname.startsWith("/host/") || pathname.startsWith("/watch/")) {
+    return null;
+  }
 
   return (
+    <>
     <nav className="fixed top-0 w-full h-16 bg-bg-secondary/80 backdrop-blur-xl border-b border-border-subtle flex items-center px-4 md:px-6 z-50">
       <div className="w-full max-w-[1920px] mx-auto flex items-center justify-between">
         {/* Left: Logo */}
@@ -98,5 +114,7 @@ export default function Navbar() {
         </div>
       </div>
     </nav>
+    <div className="h-16 flex-shrink-0" />
+    </>
   );
 }
