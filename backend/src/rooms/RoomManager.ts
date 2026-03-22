@@ -44,6 +44,18 @@ class RoomManager {
       kickedUids: new Set(),
       maxParticipants: 50,
     };
+    
+    // Add host as the first participant
+    room.participants.set(hostSocketId, {
+      socketId: hostSocketId,
+      uid: hostUid,
+      displayName: hostDisplayName,
+      photoURL: hostPhotoURL,
+      joinedAt: Date.now(),
+      isMuted: false, // host starts unmuted
+      isVoiceActive: false, // joins voice via VoiceChat component
+    });
+    
     this.rooms.set(roomId, room);
     logger.info('RoomManager', `Room created: ${roomId}`, { host: hostDisplayName, title });
     return room;

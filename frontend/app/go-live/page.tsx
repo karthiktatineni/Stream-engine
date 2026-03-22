@@ -21,6 +21,16 @@ export default function GoLiveSetup() {
   const [actualCapability, setActualCapability] = useState<string>("");
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  // Cleanup audio context on unmount
+  useEffect(() => {
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -71,7 +81,13 @@ export default function GoLiveSetup() {
       const audioTracks: MediaStreamTrack[] = [];
 
       try {
+        if (audioContextRef.current) {
+          audioContextRef.current.close().catch(() => {});
+        }
+        
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = audioContext;
+        
         const destination = audioContext.createMediaStreamDestination();
         let hasSource = false;
 
@@ -91,6 +107,11 @@ export default function GoLiveSetup() {
 
         if (hasSource) {
           audioTracks.push(...destination.stream.getAudioTracks());
+        }
+        
+        // Ensure context is running (required for some browsers)
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
         }
       } catch (audioErr) {
         console.warn("Audio mixing failed, falling back to simple combine:", audioErr);

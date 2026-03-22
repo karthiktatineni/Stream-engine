@@ -155,11 +155,16 @@ export default function VoiceChat({
     socket.on('voice-peer-left', handlePeerLeft);
     socket.on('voice-offer', handleVoiceOffer);
     socket.on('voice-answer', handleVoiceAnswer);
-    socket.on('webrtc-ice-candidate', handleVoiceIceCandidate);
+    socket.on('voice-ice-candidate', handleVoiceIceCandidate);
     
     // Auto-join if requested
     if (autoJoin && !isInVoice && micPermission === 'prompt') {
       joinVoice();
+    }
+
+    // Re-join voice signaling if socket reconnected while in voice
+    if (isInVoice && socket.connected) {
+      socket.emit('voice-join', { roomId });
     }
 
     return () => {
