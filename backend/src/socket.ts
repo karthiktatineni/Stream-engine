@@ -131,7 +131,7 @@ export const initSocket = (server: HttpServer, allowedOrigins: string[]) => {
       const { roomId } = data;
       const room = roomManager.getRoom(roomId);
 
-      if (!room || room.status !== 'live') {
+      if (!room || (room.status !== 'live' && room.status !== 'offline')) {
         if (typeof callback === 'function') callback({ success: false, error: 'Room not found or ended' });
         return;
       }
@@ -399,26 +399,21 @@ export const initSocket = (server: HttpServer, allowedOrigins: string[]) => {
     // ---- Reconnect Recovery ----
     socket.on('reconnect-to-room', (data: { roomId: string }, callback) => {
       const room = roomManager.getRoom(data.roomId);
-      if (!room || room.status !== 'live') {
+      if (!room || (room.status !== 'live' && room.status !== 'offline')) {
         if (typeof callback === 'function') callback({ success: false, error: 'Room no longer available' });
         return;
       }
 
       if (room.hostUid === userId) {
-        // Host reconnecting - clear any pending cleanup timeout
-        const pendingTimeout = hostDisconnectTimeouts.get(data.roomId);
-        if (pendingTimeout) {
-          clearTimeout(pendingTimeout);
-          hostDisconnectTimeouts.delete(data.roomId);
-          logger.info('Socket', `Host reconnection cancelled pending cleanup`, { roomId: data.roomId });
-        }
-
+        // Host reconnecting - restore live status
+        room.status = 'live';
         room.hostSocketId = socket.id;
         socket.join(data.roomId);
         const roomState = roomManager.getRoomState(room);
         io.to(data.roomId).emit('room-updated', roomState);
         if (typeof callback === 'function') callback({ success: true, room: roomState, isHost: true });
-        logger.info('Socket', `Host reconnected`, { roomId: data.roomId });
+        broadcastActiveRooms();
+        logger.info('Socket', `Host reconnected and room restored`, { roomId: data.roomId });
       } else {
         // Viewer reconnecting
         const participant: Participant = {
@@ -452,21 +447,14 @@ export const initSocket = (server: HttpServer, allowedOrigins: string[]) => {
     socket.on('disconnect', (reason) => {
       logger.info('Socket', `Disconnected: ${socket.id}`, { reason });
 
-      // Cleanup host rooms with grace period
+      // Handle host disconnect - mark room as offline but do not delete
       const hostRooms = roomManager.findRoomsByHost(socket.id);
       for (const room of hostRooms) {
-        logger.info('Socket', `Host disconnected, starting 30s grace period`, { roomId: room.id });
-        
-        const timeout = setTimeout(() => {
-          room.status = 'ended';
-          io.to(room.id).emit('stream-ended', { reason: 'host-disconnected' });
-          roomManager.deleteRoom(room.id);
-          hostDisconnectTimeouts.delete(room.id);
-          broadcastActiveRooms();
-          logger.info('Socket', `Grace period expired. Stream deleted.`, { roomId: room.id });
-        }, 30000); // 30 second grace period
-
-        hostDisconnectTimeouts.set(room.id, timeout);
+        room.status = 'offline';
+        const roomState = roomManager.getRoomState(room);
+        io.to(room.id).emit('room-updated', roomState);
+        broadcastActiveRooms();
+        logger.info('Socket', `Host disconnected, room marked offline`, { roomId: room.id });
       }
 
       // Cleanup viewer participations

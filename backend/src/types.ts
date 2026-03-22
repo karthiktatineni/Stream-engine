@@ -17,7 +17,7 @@ export interface Room {
   title: string;
   category: string;
   isPublic: boolean;
-  status: 'live' | 'ended';
+  status: 'live' | 'ended' | 'offline';
   startedAt: number;
   participants: Map<string, Participant>;
   chatRateLimit: Map<string, number[]>;

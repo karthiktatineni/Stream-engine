@@ -249,9 +249,9 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
         {/* Top bar */}
         <div className="h-12 border-b border-border-subtle flex items-center justify-between px-4 bg-bg-secondary/50 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="px-2.5 py-1 bg-live-red rounded-md text-[10px] font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-white animate-live-pulse" />
-              Live
+            <div className={`px-2.5 py-1 ${roomState?.status === 'offline' ? 'bg-bg-elevated' : 'bg-live-red'} rounded-md text-[10px] font-bold uppercase tracking-wider text-white flex items-center gap-1.5`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${roomState?.status === 'offline' ? 'bg-text-muted' : 'bg-white animate-live-pulse'}`} />
+              {roomState?.status === 'offline' ? 'Offline' : 'Live'}
             </div>
             <div className="flex items-center gap-1.5 text-xs text-text-muted">
               <Eye className="w-3.5 h-3.5" />
@@ -293,7 +293,9 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
           {!remoteStream && (
             <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-bg-primary">
               <Radio className="w-12 h-12 text-text-muted/20 mb-4" />
-              <p className="text-sm font-semibold text-text-muted animate-pulse">Waiting for host video...</p>
+              <p className="text-sm font-semibold text-text-muted animate-pulse">
+                {roomState?.status === 'offline' ? 'Stream is offline. Waiting for host...' : 'Connecting to stream...'}
+              </p>
             </div>
           )}
 

@@ -2,7 +2,7 @@ import { Room, RoomPublicInfo, RoomDetailedState, Participant } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
 
-const ROOM_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max for abandoned rooms
+const ROOM_IDLE_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (essentially permanent for active users)
 const CHAT_RATE_LIMIT_WINDOW = 5000; // 5 second window
 const CHAT_RATE_LIMIT_MAX = 10; // max 10 messages per window
 const REACTION_RATE_LIMIT_WINDOW = 3000;
