@@ -47,6 +47,8 @@ export default function VoiceChat({
     const pc = new RTCPeerConnection(ICE_SERVERS);
     const audioEl = new Audio();
     audioEl.autoplay = true;
+    audioEl.style.display = 'none'; // Ensure it's hidden
+    document.body.appendChild(audioEl); // Critical for some browsers to play audio correctly
 
     // Add local audio track
     const audioTrack = localStreamRef.current.getAudioTracks()[0];
@@ -57,6 +59,7 @@ export default function VoiceChat({
     // Handle remote audio
     pc.ontrack = (event) => {
       audioEl.srcObject = event.streams[0] || null;
+      audioEl.play().catch(console.error); // Ensure it plays even if autoplay is blocked
     };
 
     // ICE candidates

@@ -66,15 +66,43 @@ export default function GoLiveSetup() {
         // Screen share without mic is okay
       }
 
-      // Combine screen video with mic audio
-      const tracks = [...screenStream.getVideoTracks()];
-      if (micStream) {
-        tracks.push(...micStream.getAudioTracks());
-      } else if (screenStream.getAudioTracks().length > 0) {
-        tracks.push(...screenStream.getAudioTracks());
+      // Combine screen video with mixed audio
+      const videoTracks = screenStream.getVideoTracks();
+      const audioTracks: MediaStreamTrack[] = [];
+
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const destination = audioContext.createMediaStreamDestination();
+        let hasSource = false;
+
+        // Add screen/system audio if it exists
+        if (screenStream.getAudioTracks().length > 0) {
+          const screenSource = audioContext.createMediaStreamSource(screenStream);
+          screenSource.connect(destination);
+          hasSource = true;
+        }
+
+        // Add mic audio if it exists
+        if (micStream && micStream.getAudioTracks().length > 0) {
+          const micSource = audioContext.createMediaStreamSource(micStream);
+          micSource.connect(destination);
+          hasSource = true;
+        }
+
+        if (hasSource) {
+          audioTracks.push(...destination.stream.getAudioTracks());
+        }
+      } catch (audioErr) {
+        console.warn("Audio mixing failed, falling back to simple combine:", audioErr);
+        // Fallback: just use whichever is available
+        if (micStream?.getAudioTracks().length) {
+          audioTracks.push(...micStream.getAudioTracks());
+        } else if (screenStream.getAudioTracks().length) {
+          audioTracks.push(...screenStream.getAudioTracks());
+        }
       }
 
-      const combinedStream = new MediaStream(tracks);
+      const combinedStream = new MediaStream([...videoTracks, ...audioTracks]);
       const videoTrack = combinedStream.getVideoTracks()[0];
       const settings = videoTrack?.getSettings();
       const actualLabel = `Screen: ${settings?.width}x${settings?.height} @ ${Math.round(settings?.frameRate || 30)}FPS`;
