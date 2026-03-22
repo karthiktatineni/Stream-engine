@@ -96,8 +96,11 @@ export default function VoiceChat({
     if (!socket || !isInVoice) return;
 
     const handlePeerJoined = (data: { peerSocketId: string; displayName: string }) => {
-      // We are the receiver — create connection as initiator since we got notified
-      createPeerConnection(data.peerSocketId, data.displayName, true);
+      if (!socket.id) return;
+      // Use deterministic initiator selection to avoid duplicate offers
+      // One side initiates, the other waits for offer
+      const isInitiator = socket.id < data.peerSocketId;
+      createPeerConnection(data.peerSocketId, data.displayName, isInitiator);
     };
 
     const handlePeerLeft = (data: { peerSocketId: string }) => {

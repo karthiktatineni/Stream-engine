@@ -11,7 +11,7 @@ import ParticipantList from "@/components/ParticipantList";
 import {
   Play, Users, Clock, AlertTriangle, Radio, Eye,
   MessageCircle, ChevronLeft, ChevronRight, Share2,
-  WifiOff, RefreshCw, Maximize, Volume2
+  WifiOff, RefreshCw, Maximize, Volume2, VolumeX
 } from "lucide-react";
 
 interface ParticipantInfo {
@@ -53,6 +53,7 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
   const [sidePanel, setSidePanel] = useState<'chat' | 'participants'>('chat');
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
   const [volume, setVolume] = useState(0.8);
+  const [isAudioBlocked, setIsAudioBlocked] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
@@ -118,8 +119,16 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
         if (videoRef.current && stream) {
           videoRef.current.srcObject = stream;
           videoRef.current.play()
-            .then(() => setIsPlaying(true))
-            .catch(() => setIsPlaying(false));
+            .then(() => {
+              setIsPlaying(true);
+              setIsAudioBlocked(false);
+            })
+            .catch((err) => {
+              if (err.name === 'NotAllowedError') {
+                setIsAudioBlocked(true);
+              }
+              setIsPlaying(false);
+            });
         }
       };
 
@@ -185,6 +194,14 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
       } else {
         videoRef.current.requestFullscreen().catch(console.error);
       }
+    }
+  };
+
+  const handleUnmute = () => {
+    if (videoRef.current) {
+      videoRef.current.play()
+        .then(() => setIsAudioBlocked(false))
+        .catch(console.error);
     }
   };
 
@@ -296,6 +313,20 @@ export default function WatchRoom({ params }: { params: Promise<{ roomId: string
               <p className="text-sm font-semibold text-text-muted animate-pulse">
                 {roomState?.status === 'offline' ? 'Stream is offline. Waiting for host...' : 'Connecting to stream...'}
               </p>
+            </div>
+          )}
+
+          {isAudioBlocked && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all animate-in fade-in">
+              <button 
+                onClick={handleUnmute}
+                className="flex flex-col items-center gap-4 group hover:scale-105 transition-transform"
+              >
+                <div className="w-20 h-20 rounded-full bg-accent-primary flex items-center justify-center shadow-2xl shadow-accent-primary/40 group-hover:bg-accent-hover transition-colors">
+                  <VolumeX className="w-10 h-10 text-white" />
+                </div>
+                <span className="text-white font-black uppercase tracking-widest text-sm bg-black/40 px-6 py-2 rounded-full border border-white/20">Click to Unmute Stream</span>
+              </button>
             </div>
           )}
 
